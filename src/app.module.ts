@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { User } from './auth/entities/user.entity';
+import { UserDevice } from './auth/entities/user-device.entity';
 import { ClassesModule } from './classes/classes.module';
 import { ClassSubject } from './classes/entities/class-subject.entity';
 import { Class } from './classes/entities/class.entity';
@@ -24,7 +25,7 @@ import { UsersModule } from './users/users.module';
       password: 'postgres',
       database: 'hello_one',
       synchronize: true,
-      entities: [User, School, Class, Subject, ClassSubject, AppSettings],
+      entities: [User, UserDevice, School, Class, Subject, ClassSubject, AppSettings],
     }),
 
     AuthModule,

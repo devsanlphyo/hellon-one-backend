@@ -19,6 +19,14 @@ export class AppSettings {
   @Column({ nullable: true, type: 'varchar' })
   logoUrl: string | null;
 
+  /** Whether first login / new device requests require admin approval */
+  @Column({ type: 'boolean', default: true })
+  requireDeviceApproval: boolean;
+
+  /** Roles that automatically bypass device approval (e.g. ['admin']) */
+  @Column({ type: 'simple-json', default: '["admin"]' })
+  bypassApprovalRoles: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

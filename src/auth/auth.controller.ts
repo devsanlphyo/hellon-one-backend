@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Roles } from './decorators/roles.decorator';
 import { LoginDto } from './dto/login.dto';
@@ -11,8 +11,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password);
+  async login(@Body() dto: LoginDto, @Req() req: any) {
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = (typeof forwarded === 'string' ? forwarded.split(',')[0] : req.socket?.remoteAddress) || '127.0.0.1';
+    const userAgent = req.headers['user-agent'] || 'Unknown';
+
+    return this.authService.login(dto, { ip, userAgent });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

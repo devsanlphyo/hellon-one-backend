@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
   Logger,
+  Patch,
   Post,
   Req,
   UploadedFile,
@@ -107,6 +109,28 @@ export class SettingsController {
     return {
       isSuccess: true,
       message: 'Logo removed. Default icon will be used.',
+      data: settings,
+    };
+  }
+
+  /**
+   * PATCH /settings/security
+   * Admin-only. Updates device approval requirement and bypass roles.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Patch('security')
+  async updateSecurity(
+    @Body()
+    body: {
+      requireDeviceApproval?: boolean;
+      bypassApprovalRoles?: string[];
+    },
+  ) {
+    const settings = await this.settingsService.updateSecuritySettings(body);
+    return {
+      isSuccess: true,
+      message: 'Security settings updated successfully',
       data: settings,
     };
   }

@@ -10,8 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole, UserStatus } from './entities/user.entity';
+import { UserDevice } from './entities/user-device.entity';
 import { JwtPayload } from './types/jwt-payload.type';
 import { JwtService } from '@nestjs/jwt';
+import { LoginDto } from './dto/login.dto';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class AuthService implements OnApplicationBootstrap {
@@ -20,6 +23,9 @@ export class AuthService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserDevice)
+    private readonly userDeviceRepository: Repository<UserDevice>,
+    private readonly settingsService: SettingsService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -233,8 +239,23 @@ export class AuthService implements OnApplicationBootstrap {
   }
 
 
-  async login(email: string, password: string) {
-    this.logger.log(`Attempting login for email: ${email}`);
+  async login(
+    dtoOrEmail: LoginDto | string,
+    passwordOrReqMeta?: string | { ip: string; userAgent: string },
+    maybeReqMeta?: { ip: string; userAgent: string },
+  ) {
+    const isObjectDto = typeof dtoOrEmail === 'object' && dtoOrEmail !== null;
+    const email = isObjectDto ? dtoOrEmail.email : dtoOrEmail;
+    const password = isObjectDto ? dtoOrEmail.password : (passwordOrReqMeta as string);
+    const deviceId = isObjectDto && dtoOrEmail.deviceId ? dtoOrEmail.deviceId : 'default-device';
+    const deviceName = isObjectDto && dtoOrEmail.deviceName ? dtoOrEmail.deviceName : 'Web Browser';
+    const reqMeta =
+      (typeof passwordOrReqMeta === 'object' ? passwordOrReqMeta : maybeReqMeta) || {
+        ip: '127.0.0.1',
+        userAgent: 'Unknown',
+      };
+
+    this.logger.log(`Attempting login for email: ${email} [Device: ${deviceName} / ID: ${deviceId}]`);
     const existingUser = await this.userRepository.findOneBy({ email });
     if (!existingUser) {
       this.logger.warn(`Login failed: user with email ${email} not found`);
@@ -242,9 +263,7 @@ export class AuthService implements OnApplicationBootstrap {
     }
 
     if (existingUser.status === 'suspend') {
-      this.logger.warn(
-        `Login blocked: account ${email} is suspended`,
-      );
+      this.logger.warn(`Login blocked: account ${email} is suspended`);
       throw new UnauthorizedException(
         'Your account has been suspended. Please contact the administrator.',
       );
@@ -269,6 +288,91 @@ export class AuthService implements OnApplicationBootstrap {
       this.logger.warn(`Login failed: invalid password for email ${email}`);
       throw new NotFoundException('Invalid email or password');
     }
+
+    // Determine if device approval is required according to settings and roles
+    const settings = await this.settingsService.getSettings();
+    const bypassRoles = settings.bypassApprovalRoles || ['admin'];
+    const isBypassed =
+      !settings.requireDeviceApproval ||
+      bypassRoles.includes(existingUser.role) ||
+      existingUser.role === 'admin';
+
+    // Find or register device
+    let device = await this.userDeviceRepository.findOne({
+      where: { userId: existingUser.id, deviceId },
+    });
+
+    if (!device) {
+      // First time logging in from this device
+      device = this.userDeviceRepository.create({
+        userId: existingUser.id,
+        deviceId,
+        deviceName,
+        ipAddress: reqMeta.ip,
+        userAgent: reqMeta.userAgent,
+        status: isBypassed ? 'approved' : 'pending',
+        approvedAt: isBypassed ? new Date() : null,
+        lastLoginAt: isBypassed ? new Date() : null,
+      });
+      await this.userDeviceRepository.save(device);
+
+      if (!isBypassed) {
+        this.logger.warn(
+          `Login pending approval: user ${email} (role: ${existingUser.role}) on new device "${deviceName}" (ID: ${deviceId})`,
+        );
+        return {
+          isSuccess: false,
+          requiresApproval: true,
+          deviceStatus: 'pending',
+          message:
+            'This is your first login on this device. Your request has been submitted to the administrator for approval.',
+        };
+      }
+    } else {
+      // Existing device: update IP and userAgent
+      device.ipAddress = reqMeta.ip;
+      device.userAgent = reqMeta.userAgent;
+      if (deviceName && device.deviceName !== deviceName) {
+        device.deviceName = deviceName;
+      }
+
+      if (device.status === 'pending') {
+        if (isBypassed) {
+          // If user role was added to bypass or is admin, auto-approve
+          device.status = 'approved';
+          device.approvedAt = new Date();
+        } else {
+          this.logger.warn(
+            `Login blocked: device ${deviceId} for user ${email} is pending admin approval`,
+          );
+          return {
+            isSuccess: false,
+            requiresApproval: true,
+            deviceStatus: 'pending',
+            message:
+              'This device is awaiting administrator approval before you can sign in.',
+          };
+        }
+      } else if (device.status === 'rejected') {
+        this.logger.warn(
+          `Login rejected: device ${deviceId} for user ${email} was rejected`,
+        );
+        throw new UnauthorizedException(
+          'Access from this device has been rejected by the administrator. Please contact your admin.',
+        );
+      } else if (device.status === 'revoked') {
+        this.logger.warn(
+          `Login revoked: device ${deviceId} for user ${email} was revoked`,
+        );
+        throw new UnauthorizedException(
+          'Access from this device has been revoked by the administrator.',
+        );
+      }
+    }
+
+    // Device is approved: record login timestamp
+    device.lastLoginAt = new Date();
+    await this.userDeviceRepository.save(device);
 
     const payload: JwtPayload = {
       sub: existingUser.id,
