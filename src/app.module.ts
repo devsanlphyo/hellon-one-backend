@@ -1,10 +1,42 @@
-import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from './auth/auth.module';
+import { User } from './auth/entities/user.entity';
+import { ClassesModule } from './classes/classes.module';
+import { ClassSubject } from './classes/entities/class-subject.entity';
+import { Class } from './classes/entities/class.entity';
+import { HttpLoggerMiddleware } from './common/middleware/http-logger.middleware';
+import { School } from './schools/entities/school.entity';
+import { SchoolsModule } from './schools/schools.module';
+import { AppSettings } from './settings/entities/settings.entity';
+import { SettingsModule } from './settings/settings.module';
+import { Subject } from './subjects/entities/subject.entity';
+import { SubjectsModule } from './subjects/subjects.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      username: 'postgres',
+      password: 'postgres',
+      database: 'hello_one',
+      synchronize: true,
+      entities: [User, School, Class, Subject, ClassSubject, AppSettings],
+    }),
+
+    AuthModule,
+    UsersModule,
+    SchoolsModule,
+    ClassesModule,
+    SubjectsModule,
+    SettingsModule,
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(HttpLoggerMiddleware).forRoutes('*');
+  }
+}
