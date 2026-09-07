@@ -17,7 +17,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const status =
+    let status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -28,7 +28,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message: string | string[] = 'Internal server error';
     let errorType = 'InternalServerError';
 
-    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+    if (exception && (exception as any).name === 'MulterError') {
+      const multerErr = exception as any;
+      if (multerErr.code === 'LIMIT_FILE_SIZE') {
+        status = HttpStatus.PAYLOAD_TOO_LARGE;
+        message = 'File size exceeds the 10MB limit.';
+        errorType = 'PayloadTooLarge';
+      } else {
+        status = HttpStatus.BAD_REQUEST;
+        message = multerErr.message;
+        errorType = 'BadRequest';
+      }
+    } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
       const resp = exceptionResponse as Record<string, any>;
       message = resp.message || resp.error || message;
       errorType =
