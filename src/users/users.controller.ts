@@ -70,6 +70,13 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('me/devices')
+  async getMyDevices(@Request() req) {
+    const userId = req.user.id || req.user.sub;
+    return this.usersService.getMyDevices(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('me/avatar')
   @UseInterceptors(FileInterceptor('avatar', avatarMulterOptions))
   async uploadMyAvatar(

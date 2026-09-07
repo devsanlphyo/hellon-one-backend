@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import { join } from 'path';
 import { Repository } from 'typeorm';
 import { User, UserRole, UserStatus } from '../auth/entities/user.entity';
+import { UserDevice } from '../auth/entities/user-device.entity';
 import { QueryUserDto } from './dto/query-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -20,6 +21,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserDevice)
+    private readonly userDeviceRepository: Repository<UserDevice>,
   ) {}
 
   async findAll(query: QueryUserDto) {
@@ -228,6 +231,17 @@ export class UsersService {
       isSuccess: true,
       message: 'Fetching user profile success',
       profile,
+    };
+  }
+
+  async getMyDevices(userId: string) {
+    const devices = await this.userDeviceRepository.find({
+      where: { userId },
+      order: { lastLoginAt: 'DESC', createdAt: 'DESC' },
+    });
+    return {
+      isSuccess: true,
+      devices,
     };
   }
 }
