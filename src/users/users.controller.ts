@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -74,6 +75,31 @@ export class UsersController {
   async getMyDevices(@Request() req) {
     const userId = req.user.id || req.user.sub;
     return this.usersService.getMyDevices(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/devices/signout-others')
+  async signOutOtherDevices(
+    @Request() req,
+    @Headers('x-device-id') headerDeviceId?: string,
+    @Body('currentDeviceId') bodyDeviceId?: string,
+  ) {
+    const userId = req.user.id || req.user.sub;
+    const callerDeviceId = headerDeviceId || bodyDeviceId || '';
+    return this.usersService.signOutOtherDevices(userId, callerDeviceId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/devices/:deviceId/signout')
+  async signOutDevice(
+    @Param('deviceId') targetDeviceId: string,
+    @Request() req,
+    @Headers('x-device-id') headerDeviceId?: string,
+    @Body('currentDeviceId') bodyDeviceId?: string,
+  ) {
+    const userId = req.user.id || req.user.sub;
+    const callerDeviceId = headerDeviceId || bodyDeviceId || '';
+    return this.usersService.signOutDevice(userId, callerDeviceId, targetDeviceId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -239,11 +240,135 @@ export class UsersService {
       where: { userId },
       order: { lastLoginAt: 'DESC', createdAt: 'DESC' },
     });
+
+    // Identify first registered device by earliest createdAt
+    let firstDeviceId: string | null = null;
+    if (devices.length > 0) {
+      const sortedByCreation = [...devices].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+      firstDeviceId = sortedByCreation[0].deviceId;
+    }
+
+    const enhancedDevices = devices.map((dev) => ({
+      ...dev,
+      isFirstDevice: dev.deviceId === firstDeviceId,
+    }));
+
     return {
       isSuccess: true,
-      devices,
+      devices: enhancedDevices,
+      firstDeviceId,
+    };
+  }
+
+  async signOutOtherDevices(userId: string, callerDeviceId: string) {
+    if (!callerDeviceId) {
+      throw new BadRequestException('Current device ID is required.');
+    }
+
+    // Determine the first registered device for this user
+    const firstDevice = await this.userDeviceRepository.findOne({
+      where: { userId },
+      order: { createdAt: 'ASC' },
+    });
+
+    if (!firstDevice) {
+      throw new NotFoundException('No registered devices found for this account.');
+    }
+
+    // Enforcement: this can ONLY be performed from the first device
+    if (firstDevice.deviceId !== callerDeviceId) {
+      this.logger.warn(
+        `Unauthorized signout attempt: User ${userId} requested signout from device ${callerDeviceId}, but first device is ${firstDevice.deviceId}`,
+      );
+      throw new ForbiddenException(
+        'Only the first registered device can sign out other devices.',
+      );
+    }
+
+    // Revoke all other devices for this user
+    const allDevices = await this.userDeviceRepository.find({
+      where: { userId },
+    });
+
+    let revokedCount = 0;
+    for (const dev of allDevices) {
+      if (dev.deviceId !== callerDeviceId && dev.status !== 'revoked') {
+        dev.status = 'revoked';
+        await this.userDeviceRepository.save(dev);
+        revokedCount++;
+      }
+    }
+
+    this.logger.log(
+      `Primary device ${callerDeviceId} signed out ${revokedCount} other device(s) for user ${userId}`,
+    );
+
+    return {
+      isSuccess: true,
+      message: `Successfully signed out ${revokedCount} other device(s).`,
+      revokedCount,
+    };
+  }
+
+  async signOutDevice(
+    userId: string,
+    callerDeviceId: string,
+    targetDeviceId: string,
+  ) {
+    if (!callerDeviceId) {
+      throw new BadRequestException('Current device ID is required.');
+    }
+
+    if (!targetDeviceId) {
+      throw new BadRequestException('Target device ID is required.');
+    }
+
+    if (callerDeviceId === targetDeviceId) {
+      throw new BadRequestException(
+        'Cannot sign out the current active device with this action. Use regular logout.',
+      );
+    }
+
+    // Determine the first registered device for this user
+    const firstDevice = await this.userDeviceRepository.findOne({
+      where: { userId },
+      order: { createdAt: 'ASC' },
+    });
+
+    if (!firstDevice) {
+      throw new NotFoundException('No registered devices found for this account.');
+    }
+
+    // Enforcement: this can ONLY be performed from the first device
+    if (firstDevice.deviceId !== callerDeviceId) {
+      throw new ForbiddenException(
+        'Only the first registered device can sign out other devices.',
+      );
+    }
+
+    const targetDevice = await this.userDeviceRepository.findOne({
+      where: { userId, deviceId: targetDeviceId },
+    });
+
+    if (!targetDevice) {
+      throw new NotFoundException('Target device not found.');
+    }
+
+    targetDevice.status = 'revoked';
+    await this.userDeviceRepository.save(targetDevice);
+
+    this.logger.log(
+      `Primary device ${callerDeviceId} signed out target device ${targetDeviceId} for user ${userId}`,
+    );
+
+    return {
+      isSuccess: true,
+      message: `Device "${targetDevice.deviceName || 'Client'}" has been signed out.`,
     };
   }
 }
+
 
 
