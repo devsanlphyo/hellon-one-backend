@@ -19,6 +19,11 @@ import { LeaveRequest } from './leaves/entities/leave-request.entity';
 import { LeavesModule } from './leaves/leaves.module';
 import { LessonPlan } from './lesson-plans/entities/lesson-plan.entity';
 import { LessonPlansModule } from './lesson-plans/lesson-plans.module';
+import { FeedPost } from './feed/entities/feed-post.entity';
+import { FeedPostMedia } from './feed/entities/feed-post-media.entity';
+import { FeedPostReaction } from './feed/entities/feed-post-reaction.entity';
+import { FeedPostComment } from './feed/entities/feed-post-comment.entity';
+import { FeedModule } from './feed/feed.module';
 import { Subject } from './subjects/entities/subject.entity';
 import { SubjectsModule } from './subjects/subjects.module';
 import { UsersModule } from './users/users.module';
@@ -46,6 +51,10 @@ import { UsersModule } from './users/users.module';
         TeacherAttendance,
         LeaveRequest,
         LessonPlan,
+        FeedPost,
+        FeedPostMedia,
+        FeedPostReaction,
+        FeedPostComment,
       ],
     }),
 
@@ -58,6 +67,7 @@ import { UsersModule } from './users/users.module';
     ShiftsModule,
     LeavesModule,
     LessonPlansModule,
+    FeedModule,
   ],
 })
 export class AppModule implements NestModule {

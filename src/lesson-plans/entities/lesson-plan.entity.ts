@@ -53,7 +53,7 @@ export class LessonPlan {
   @Column()
   title: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   topic: string | null;
 
   @Column({ type: 'text', nullable: true })
@@ -71,7 +71,7 @@ export class LessonPlan {
   @Column({ type: 'varchar', nullable: true })
   mimeType: string | null;
 
-  @Column({ default: false })
+  @Column({ type: 'boolean', default: false })
   isLate: boolean;
 
   @Column({ type: 'text', nullable: true })

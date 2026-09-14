@@ -464,7 +464,7 @@ export class ShiftsService implements OnApplicationBootstrap {
     const assignedShift = assignment?.shift || null;
 
     let isWithinShift = true;
-    if (user.role === 'teacher' && assignedShift) {
+    if (assignedShift) {
       const windowCheck = this.checkShiftWindow(assignedShift);
       isWithinShift = windowCheck.isWithinShift;
     }
@@ -472,8 +472,8 @@ export class ShiftsService implements OnApplicationBootstrap {
     const isCheckedIn = Boolean(attendance);
     const isCheckedOut = Boolean(attendance?.checkOutTime);
 
-    // canCheckIn: Not already checked in, and is within shift (or non-teacher)
-    const canCheckIn = !isCheckedIn && (isWithinShift || user.role !== 'teacher');
+    // canCheckIn: Not already checked in today (unrestricted check-in for all staff)
+    const canCheckIn = !isCheckedIn;
     // canCheckOut: Checked in, but not yet checked out
     const canCheckOut = isCheckedIn && !isCheckedOut;
 
@@ -547,14 +547,9 @@ export class ShiftsService implements OnApplicationBootstrap {
 
     let status: 'on_time' | 'late' | 'in_progress' = 'in_progress';
 
-    // Verify shift window for teachers
-    if (user.role === 'teacher' && assignedShift) {
+    // Calculate late/on-time status based on assigned shift (no check-in blocking)
+    if (assignedShift) {
       const windowCheck = this.checkShiftWindow(assignedShift);
-      if (!windowCheck.isWithinShift) {
-        throw new BadRequestException(
-          `Check-in is currently unavailable. Your shift (${assignedShift.name}) runs from ${assignedShift.startTime} to ${assignedShift.endTime}.`,
-        );
-      }
       status = windowCheck.isLate ? 'late' : 'in_progress';
     }
 
