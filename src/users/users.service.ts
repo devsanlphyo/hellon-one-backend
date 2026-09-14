@@ -53,7 +53,23 @@ export class UsersService {
       queryBuilder.andWhere('user.status = :status', { status: query.status });
     }
 
+    if (query.schoolId && query.schoolId !== 'default' && query.schoolId !== 'all') {
+      if (query.schoolId === 'unassigned' || query.schoolId === 'none') {
+        queryBuilder.andWhere('user.schoolId IS NULL');
+      } else {
+        queryBuilder.andWhere('user.schoolId = :schoolId', { schoolId: query.schoolId });
+      }
+    }
+
+    if (query.eligibleForSchoolId) {
+      queryBuilder.andWhere(
+        '(user.schoolId = :eligibleForSchoolId OR user.schoolId IS NULL)',
+        { eligibleForSchoolId: query.eligibleForSchoolId },
+      );
+    }
+
     queryBuilder
+      .leftJoinAndSelect('user.school', 'school')
       .select([
         'user.id',
         'user.fullName',
@@ -61,6 +77,9 @@ export class UsersService {
         'user.role',
         'user.status',
         'user.avatarUrl',
+        'user.schoolId',
+        'school.id',
+        'school.name',
         'user.createdAt',
         'user.updatedAt',
       ])
@@ -86,6 +105,7 @@ export class UsersService {
     this.logger.log(`Fetching user by ID: ${id}`);
     const existingUser = await this.userRepository.findOne({
       where: { id },
+      relations: { school: true },
       select: {
         id: true,
         fullName: true,
@@ -93,6 +113,11 @@ export class UsersService {
         role: true,
         status: true,
         avatarUrl: true,
+        schoolId: true,
+        school: {
+          id: true,
+          name: true,
+        },
         createdAt: true,
         updatedAt: true,
       },

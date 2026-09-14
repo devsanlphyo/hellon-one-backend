@@ -11,6 +11,10 @@ import { School } from './schools/entities/school.entity';
 import { SchoolsModule } from './schools/schools.module';
 import { AppSettings } from './settings/entities/settings.entity';
 import { SettingsModule } from './settings/settings.module';
+import { Shift } from './shifts/entities/shift.entity';
+import { TeacherAttendance } from './shifts/entities/teacher-attendance.entity';
+import { TeacherShift } from './shifts/entities/teacher-shift.entity';
+import { ShiftsModule } from './shifts/shifts.module';
 import { Subject } from './subjects/entities/subject.entity';
 import { SubjectsModule } from './subjects/subjects.module';
 import { UsersModule } from './users/users.module';
@@ -25,7 +29,18 @@ import { UsersModule } from './users/users.module';
       password: 'postgres',
       database: 'hello_one',
       synchronize: true,
-      entities: [User, UserDevice, School, Class, Subject, ClassSubject, AppSettings],
+      entities: [
+        User,
+        UserDevice,
+        School,
+        Class,
+        Subject,
+        ClassSubject,
+        AppSettings,
+        Shift,
+        TeacherShift,
+        TeacherAttendance,
+      ],
     }),
 
     AuthModule,
@@ -34,6 +49,7 @@ import { UsersModule } from './users/users.module';
     ClassesModule,
     SubjectsModule,
     SettingsModule,
+    ShiftsModule,
   ],
 })
 export class AppModule implements NestModule {

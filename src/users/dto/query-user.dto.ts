@@ -26,4 +26,12 @@ export class QueryUserDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolId?: string;
+
+  @IsOptional()
+  @IsString()
+  eligibleForSchoolId?: string;
 }
