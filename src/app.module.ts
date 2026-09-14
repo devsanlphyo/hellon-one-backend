@@ -15,6 +15,8 @@ import { Shift } from './shifts/entities/shift.entity';
 import { TeacherAttendance } from './shifts/entities/teacher-attendance.entity';
 import { TeacherShift } from './shifts/entities/teacher-shift.entity';
 import { ShiftsModule } from './shifts/shifts.module';
+import { LeaveRequest } from './leaves/entities/leave-request.entity';
+import { LeavesModule } from './leaves/leaves.module';
 import { Subject } from './subjects/entities/subject.entity';
 import { SubjectsModule } from './subjects/subjects.module';
 import { UsersModule } from './users/users.module';
@@ -40,6 +42,7 @@ import { UsersModule } from './users/users.module';
         Shift,
         TeacherShift,
         TeacherAttendance,
+        LeaveRequest,
       ],
     }),
 
@@ -50,6 +53,7 @@ import { UsersModule } from './users/users.module';
     SubjectsModule,
     SettingsModule,
     ShiftsModule,
+    LeavesModule,
   ],
 })
 export class AppModule implements NestModule {

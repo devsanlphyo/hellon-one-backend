@@ -8,6 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
+import { LeaveRequest } from '../leaves/entities/leave-request.entity';
 import { AssignShiftDto } from './dto/assign-shift.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
@@ -28,6 +29,8 @@ export class ShiftsService implements OnApplicationBootstrap {
     private readonly attendanceRepository: Repository<TeacherAttendance>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(LeaveRequest)
+    private readonly leaveRepository: Repository<LeaveRequest>,
   ) {}
 
   async onApplicationBootstrap() {
@@ -668,18 +671,33 @@ export class ShiftsService implements OnApplicationBootstrap {
       if (as.shift) assignmentMap.set(as.teacherId, as.shift);
     });
 
+    // 3b. Fetch approved leaves for targetDate
+    const approvedLeaves = await this.leaveRepository
+      .createQueryBuilder('leave')
+      .where('leave.status = :approved', { approved: 'approved' })
+      .andWhere('leave.startDate <= :targetDate', { targetDate })
+      .andWhere('leave.endDate >= :targetDate', { targetDate })
+      .getMany();
+
+    const leaveMap = new Map<string, LeaveRequest>();
+    approvedLeaves.forEach((l) => leaveMap.set(l.userId, l));
+
     // 4. Map staff rows
     const allRecords = staffList.map((staff, idx) => {
       const att = attendanceMap.get(staff.id);
       const shift = assignmentMap.get(staff.id);
+      const leave = leaveMap.get(staff.id);
 
       let monitorStatus:
         | 'checked_out'
         | 'checked_in'
         | 'late'
-        | 'not_checked_in' = 'not_checked_in';
+        | 'not_checked_in'
+        | 'on_leave' = 'not_checked_in';
 
-      if (att?.checkOutTime) {
+      if (leave) {
+        monitorStatus = 'on_leave';
+      } else if (att?.checkOutTime) {
         monitorStatus = 'checked_out';
       } else if (att?.checkInTime) {
         monitorStatus = att.status === 'late' ? 'late' : 'checked_in';
@@ -706,13 +724,16 @@ export class ShiftsService implements OnApplicationBootstrap {
         checkInTime: att?.checkInTime || null,
         checkOutTime: att?.checkOutTime || null,
         duration: att?.duration || null,
-        notes: att?.notes || null,
+        notes: leave ? `On Approved Leave: ${leave.reason}` : att?.notes || null,
       };
     });
 
     // 5. Calculate KPI counts
     const alreadyCheckedCount = allRecords.filter(
-      (r) => r.status !== 'not_checked_in',
+      (r) => r.status === 'checked_in' || r.status === 'checked_out' || r.status === 'late',
+    ).length;
+    const onLeaveCount = allRecords.filter(
+      (r) => r.status === 'on_leave',
     ).length;
     const notCheckedCount = allRecords.filter(
       (r) => r.status === 'not_checked_in',
@@ -729,6 +750,8 @@ export class ShiftsService implements OnApplicationBootstrap {
         filteredRecords = allRecords.filter((r) => r.status === 'checked_out');
       } else if (query.status === 'not_checked_in') {
         filteredRecords = allRecords.filter((r) => r.status === 'not_checked_in');
+      } else if (query.status === 'on_leave') {
+        filteredRecords = allRecords.filter((r) => r.status === 'on_leave');
       }
     }
 
@@ -737,6 +760,7 @@ export class ShiftsService implements OnApplicationBootstrap {
       summary: {
         alreadyCheckedCount,
         notCheckedCount,
+        onLeaveCount,
         totalCount: allRecords.length,
       },
       records: filteredRecords,
