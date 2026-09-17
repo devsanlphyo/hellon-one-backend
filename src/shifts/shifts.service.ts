@@ -11,6 +11,8 @@ import { User } from '../auth/entities/user.entity';
 import { LeaveRequest } from '../leaves/entities/leave-request.entity';
 import { AssignShiftDto } from './dto/assign-shift.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
+import { CreateShiftDefinitionDto } from './dto/create-shift-definition.dto';
+import { UpdateShiftDefinitionDto } from './dto/update-shift-definition.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
 import { Shift } from './entities/shift.entity';
 import { TeacherAttendance } from './entities/teacher-attendance.entity';
@@ -225,10 +227,78 @@ export class ShiftsService implements OnApplicationBootstrap {
     return shiftsWithCounts;
   }
 
+  async createShift(dto: CreateShiftDefinitionDto) {
+    const existing = await this.shiftRepository.findOne({
+      where: [{ code: dto.code }, { name: dto.name }],
+    });
+
+    if (existing) {
+      throw new BadRequestException('A shift with this name or code already exists');
+    }
+
+    const shift = this.shiftRepository.create({
+      name: dto.name,
+      code: dto.code.toLowerCase().trim().replace(/\s+/g, '-'),
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      description: dto.description || '',
+      color: dto.color || 'sky',
+      isActive: true,
+    });
+
+    return this.shiftRepository.save(shift);
+  }
+
+  async updateShift(id: string, dto: UpdateShiftDefinitionDto) {
+    const shift = await this.shiftRepository.findOne({ where: { id } });
+    if (!shift) {
+      throw new NotFoundException(`Shift not found with ID ${id}`);
+    }
+
+    if (dto.name && dto.name !== shift.name) {
+      const existingName = await this.shiftRepository.findOne({
+        where: { name: dto.name },
+      });
+      if (existingName && existingName.id !== id) {
+        throw new BadRequestException('Another shift already uses this name');
+      }
+      shift.name = dto.name;
+    }
+
+    if (dto.startTime !== undefined) shift.startTime = dto.startTime;
+    if (dto.endTime !== undefined) shift.endTime = dto.endTime;
+    if (dto.description !== undefined) shift.description = dto.description;
+    if (dto.color !== undefined) shift.color = dto.color;
+    if (dto.isActive !== undefined) shift.isActive = dto.isActive;
+
+    return this.shiftRepository.save(shift);
+  }
+
+  async deleteShift(id: string) {
+    const shift = await this.shiftRepository.findOne({ where: { id } });
+    if (!shift) {
+      throw new NotFoundException(`Shift not found with ID ${id}`);
+    }
+
+    const assignedCount = await this.teacherShiftRepository.count({
+      where: { shiftId: id },
+    });
+
+    if (assignedCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete shift "${shift.name}" because ${assignedCount} faculty member(s) are currently assigned to it. Please unassign or reassign them first.`,
+      );
+    }
+
+    await this.shiftRepository.remove(shift);
+    return { success: true, message: `Shift "${shift.name}" successfully deleted` };
+  }
+
   async getTeachersWithShifts() {
-    // Get all teachers
+    // Get all teachers with school details
     const teachers = await this.userRepository.find({
       where: { role: 'teacher' },
+      relations: { school: true },
       order: { fullName: 'ASC' },
     });
 
@@ -250,6 +320,13 @@ export class ShiftsService implements OnApplicationBootstrap {
         email: teacher.email,
         status: teacher.status,
         avatarUrl: teacher.avatarUrl,
+        school: teacher.school
+          ? {
+              id: teacher.school.id,
+              name: teacher.school.name,
+              code: teacher.school.code,
+            }
+          : null,
         assignment: assignment
           ? {
               id: assignment.id,

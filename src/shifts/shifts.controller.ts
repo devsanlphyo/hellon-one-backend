@@ -16,6 +16,8 @@ import { JwtAuthGuard } from '../auth/jwt/jwt-auth.guard';
 import { AssignShiftDto } from './dto/assign-shift.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { CheckInDto, CheckOutDto } from './dto/check-in-out.dto';
+import { CreateShiftDefinitionDto } from './dto/create-shift-definition.dto';
+import { UpdateShiftDefinitionDto } from './dto/update-shift-definition.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
 import { ShiftsService } from './shifts.service';
 
@@ -28,6 +30,27 @@ export class ShiftsController {
   @Get()
   async getShifts() {
     return this.shiftsService.getAllShifts();
+  }
+
+  @Post()
+  @Roles('admin')
+  async createShift(@Body() dto: CreateShiftDefinitionDto) {
+    return this.shiftsService.createShift(dto);
+  }
+
+  @Patch(':id')
+  @Roles('admin')
+  async updateShift(
+    @Param('id') id: string,
+    @Body() dto: UpdateShiftDefinitionDto,
+  ) {
+    return this.shiftsService.updateShift(id, dto);
+  }
+
+  @Delete(':id')
+  @Roles('admin')
+  async deleteShift(@Param('id') id: string) {
+    return this.shiftsService.deleteShift(id);
   }
 
   @Get('teachers')
