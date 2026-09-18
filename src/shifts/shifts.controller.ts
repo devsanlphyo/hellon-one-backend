@@ -17,6 +17,9 @@ import { AssignShiftDto } from './dto/assign-shift.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { CheckInDto, CheckOutDto } from './dto/check-in-out.dto';
 import { CreateShiftDefinitionDto } from './dto/create-shift-definition.dto';
+import { SaveStaffScheduleDto } from './dto/save-staff-schedule.dto';
+import { SaveTeacherScheduleDto } from './dto/save-teacher-schedule.dto';
+import { SetCalendarDayDto } from './dto/set-calendar-day.dto';
 import { UpdateShiftDefinitionDto } from './dto/update-shift-definition.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
 import { ShiftsService } from './shifts.service';
@@ -26,6 +29,8 @@ import { ShiftsService } from './shifts.service';
 @Roles('headmaster', 'director', 'admin')
 export class ShiftsController {
   constructor(private readonly shiftsService: ShiftsService) {}
+
+  // ── SHIFT DEFINITIONS ──
 
   @Get()
   async getShifts() {
@@ -52,6 +57,57 @@ export class ShiftsController {
   async deleteShift(@Param('id') id: string) {
     return this.shiftsService.deleteShift(id);
   }
+
+  // ── 7-DAY TEACHER SHIFT MATRIX ──
+
+  @Get('schedules/teachers')
+  async getTeacherScheduleMatrix() {
+    return this.shiftsService.getTeacherScheduleMatrix();
+  }
+
+  @Post('schedules/teachers')
+  async saveTeacherScheduleMatrix(@Body() dto: SaveTeacherScheduleDto) {
+    return this.shiftsService.saveTeacherScheduleMatrix(dto);
+  }
+
+  // ── STAFF WORKING DAYS (ASSISTANTS & OFFICERS) ──
+
+  @Get('schedules/staff')
+  async getStaffSchedules() {
+    return this.shiftsService.getStaffScheduleList();
+  }
+
+  @Post('schedules/staff')
+  async saveStaffSchedule(@Body() dto: SaveStaffScheduleDto) {
+    return this.shiftsService.saveStaffSchedule(dto);
+  }
+
+  // ── SCHOOL CALENDAR DAYS ──
+
+  @Get('calendar')
+  @Roles('teacher', 'assistant', 'officer', 'headmaster', 'director', 'admin')
+  async getAllCalendarDays() {
+    return this.shiftsService.getAllCalendarDays();
+  }
+
+  @Get('calendar/status')
+  @Roles('teacher', 'assistant', 'officer', 'headmaster', 'director', 'admin')
+  async getCalendarDayStatus(@Query('date') date?: string) {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+    return this.shiftsService.getCalendarDayStatus(targetDate);
+  }
+
+  @Post('calendar')
+  async setCalendarDay(@Body() dto: SetCalendarDayDto) {
+    return this.shiftsService.setCalendarDay(dto);
+  }
+
+  @Delete('calendar/:date')
+  async deleteCalendarDay(@Param('date') date: string) {
+    return this.shiftsService.deleteCalendarDay(date);
+  }
+
+  // ── LEGACY ASSIGNMENT ENDPOINTS (COMPATIBILITY) ──
 
   @Get('teachers')
   async getTeachersWithShifts() {
@@ -109,7 +165,10 @@ export class ShiftsController {
   }
 
   @Get('attendance')
-  async getAttendance(@Query('teacherId') teacherId?: string) {
-    return this.shiftsService.getAttendanceRecords(teacherId);
+  async getAttendance(
+    @Query('staffId') staffId?: string,
+    @Query('teacherId') teacherId?: string,
+  ) {
+    return this.shiftsService.getAttendanceRecords(staffId || teacherId);
   }
 }

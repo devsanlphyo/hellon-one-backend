@@ -28,4 +28,7 @@ export class CreateShiftDefinitionDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  graceMinutes?: number;
 }

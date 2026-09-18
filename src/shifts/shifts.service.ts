@@ -12,9 +12,14 @@ import { LeaveRequest } from '../leaves/entities/leave-request.entity';
 import { AssignShiftDto } from './dto/assign-shift.dto';
 import { AttendanceQueryDto } from './dto/attendance-query.dto';
 import { CreateShiftDefinitionDto } from './dto/create-shift-definition.dto';
+import { SaveStaffScheduleDto } from './dto/save-staff-schedule.dto';
+import { SaveTeacherScheduleDto } from './dto/save-teacher-schedule.dto';
+import { SetCalendarDayDto } from './dto/set-calendar-day.dto';
 import { UpdateShiftDefinitionDto } from './dto/update-shift-definition.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
+import { CalendarDay } from './entities/calendar-day.entity';
 import { Shift } from './entities/shift.entity';
+import { StaffSchedule } from './entities/staff-schedule.entity';
 import { TeacherAttendance } from './entities/teacher-attendance.entity';
 import { TeacherShift } from './entities/teacher-shift.entity';
 
@@ -25,6 +30,10 @@ export class ShiftsService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(Shift)
     private readonly shiftRepository: Repository<Shift>,
+    @InjectRepository(StaffSchedule)
+    private readonly staffScheduleRepository: Repository<StaffSchedule>,
+    @InjectRepository(CalendarDay)
+    private readonly calendarDayRepository: Repository<CalendarDay>,
     @InjectRepository(TeacherShift)
     private readonly teacherShiftRepository: Repository<TeacherShift>,
     @InjectRepository(TeacherAttendance)
@@ -36,190 +45,37 @@ export class ShiftsService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedStandardShifts();
-    await this.seedInitialAssignmentsAndAttendance();
+    // Auto-seeding disabled to keep database clean
   }
 
-  private async seedStandardShifts() {
-    const defaultShifts = [
-      {
-        name: 'Morning Shift',
-        code: 'morning',
-        startTime: '09:00',
-        endTime: '12:00',
-        description: 'Morning core curriculum, lectures, and laboratory duty.',
-        color: 'sky',
-        isActive: true,
-      },
-      {
-        name: 'Noon Shift',
-        code: 'noon',
-        startTime: '13:00',
-        endTime: '17:00',
-        description: 'Afternoon classes, academic mentoring, and campus supervision.',
-        color: 'amber',
-        isActive: true,
-      },
-      {
-        name: 'Full-Time Shift',
-        code: 'fulltime',
-        startTime: '09:00',
-        endTime: '17:00',
-        description: 'Comprehensive all-day teaching, student counseling, and department duties.',
-        color: 'indigo',
-        isActive: true,
-      },
-    ];
-
-    for (const shiftData of defaultShifts) {
-      const existing = await this.shiftRepository.findOne({
-        where: { code: shiftData.code },
-      });
-      if (!existing) {
-        const shift = this.shiftRepository.create(shiftData);
-        await this.shiftRepository.save(shift);
-        this.logger.log(`Seeded shift: ${shift.name}`);
-      }
-    }
-  }
-
-  private async seedInitialAssignmentsAndAttendance() {
-    const count = await this.teacherShiftRepository.count();
-    if (count > 0) {
-      return;
-    }
-
-    const teachers = await this.userRepository.find({
-      where: { role: 'teacher' },
-      order: { createdAt: 'ASC' },
-      take: 6,
-    });
-
-    if (teachers.length === 0) {
-      return;
-    }
-
-    const morningShift = await this.shiftRepository.findOne({ where: { code: 'morning' } });
-    const noonShift = await this.shiftRepository.findOne({ where: { code: 'noon' } });
-    const fulltimeShift = await this.shiftRepository.findOne({ where: { code: 'fulltime' } });
-
-    if (!morningShift || !noonShift || !fulltimeShift) {
-      return;
-    }
-
-    const shiftMap = [
-      morningShift,
-      noonShift,
-      fulltimeShift,
-      morningShift,
-      noonShift,
-      fulltimeShift,
-    ];
-
-    // Seed assignments
-    for (let i = 0; i < teachers.length; i++) {
-      const teacher = teachers[i];
-      const assignedShift = shiftMap[i % shiftMap.length];
-
-      const assignment = this.teacherShiftRepository.create({
-        teacherId: teacher.id,
-        shiftId: assignedShift.id,
-        semester: 'Fall 2026 Semester',
-        isPermanent: true,
-        status: 'active',
-        notes: `Assigned for full semester duty by Headmaster.`,
-      });
-      await this.teacherShiftRepository.save(assignment);
-    }
-
-    this.logger.log(`Seeded initial teacher shift assignments for ${teachers.length} teachers.`);
-
-    // Seed realistic check-in / check-out records for these teachers
-    const today = new Date().toISOString().split('T')[0];
-    const sampleAttendances = [
-      {
-        teacher: teachers[0],
-        shift: morningShift,
-        date: today,
-        checkInTime: '08:52 AM',
-        checkOutTime: '12:05 PM',
-        duration: '3h 13m',
-        status: 'completed' as const,
-        notes: 'Signed out on time after morning lab session.',
-      },
-      {
-        teacher: teachers[1],
-        shift: noonShift,
-        date: today,
-        checkInTime: '12:55 PM',
-        checkOutTime: null,
-        duration: 'In Progress',
-        status: 'in_progress' as const,
-        notes: 'Currently conducting afternoon tutorial.',
-      },
-      {
-        teacher: teachers[2],
-        shift: fulltimeShift,
-        date: today,
-        checkInTime: '09:14 AM',
-        checkOutTime: null,
-        duration: 'In Progress',
-        status: 'late' as const,
-        notes: 'Arrived 14 mins late due to campus transit delay.',
-      },
-      {
-        teacher: teachers[3] || teachers[0],
-        shift: morningShift,
-        date: '2026-09-06',
-        checkInTime: '08:48 AM',
-        checkOutTime: '12:02 PM',
-        duration: '3h 14m',
-        status: 'completed' as const,
-        notes: 'Punctual attendance.',
-      },
-      {
-        teacher: teachers[4] || teachers[1],
-        shift: noonShift,
-        date: '2026-09-06',
-        checkInTime: '13:00 PM',
-        checkOutTime: '17:10 PM',
-        duration: '4h 10m',
-        status: 'completed' as const,
-        notes: 'Completed semester office hours.',
-      },
-    ];
-
-    for (const item of sampleAttendances) {
-      const record = this.attendanceRepository.create({
-        teacherId: item.teacher.id,
-        shiftId: item.shift.id,
-        date: item.date,
-        checkInTime: item.checkInTime,
-        checkOutTime: item.checkOutTime,
-        duration: item.duration,
-        status: item.status,
-        notes: item.notes,
-      });
-      await this.attendanceRepository.save(record);
-    }
-
-    this.logger.log(`Seeded initial teacher attendance check-in/out records.`);
-  }
+  // ── SHIFT DEFINITIONS CRUD ──
 
   async getAllShifts() {
     const shifts = await this.shiftRepository.find({
       order: { startTime: 'ASC' },
     });
 
-    // Attach active teacher count for each shift
+    // Attach active teacher count for each shift (from staff_schedules and legacy teacher_shifts)
     const shiftsWithCounts = await Promise.all(
       shifts.map(async (shift) => {
-        const assignedCount = await this.teacherShiftRepository.count({
+        const assignedInSchedules = await this.staffScheduleRepository
+          .createQueryBuilder('ss')
+          .select('COUNT(DISTINCT ss.userId)', 'cnt')
+          .where('ss.shiftId = :shiftId', { shiftId: shift.id })
+          .getRawOne();
+
+        const assignedLegacy = await this.teacherShiftRepository.count({
           where: { shiftId: shift.id, status: 'active' },
         });
+
+        const totalAssigned = Math.max(
+          parseInt(assignedInSchedules?.cnt || '0', 10),
+          assignedLegacy,
+        );
+
         return {
           ...shift,
-          assignedCount,
+          assignedCount: totalAssigned,
         };
       }),
     );
@@ -243,6 +99,7 @@ export class ShiftsService implements OnApplicationBootstrap {
       endTime: dto.endTime,
       description: dto.description || '',
       color: dto.color || 'sky',
+      graceMinutes: dto.graceMinutes !== undefined ? Number(dto.graceMinutes) : 15,
       isActive: true,
     });
 
@@ -269,6 +126,7 @@ export class ShiftsService implements OnApplicationBootstrap {
     if (dto.endTime !== undefined) shift.endTime = dto.endTime;
     if (dto.description !== undefined) shift.description = dto.description;
     if (dto.color !== undefined) shift.color = dto.color;
+    if (dto.graceMinutes !== undefined) shift.graceMinutes = Number(dto.graceMinutes);
     if (dto.isActive !== undefined) shift.isActive = dto.isActive;
 
     return this.shiftRepository.save(shift);
@@ -280,13 +138,13 @@ export class ShiftsService implements OnApplicationBootstrap {
       throw new NotFoundException(`Shift not found with ID ${id}`);
     }
 
-    const assignedCount = await this.teacherShiftRepository.count({
+    const assignedCount = await this.staffScheduleRepository.count({
       where: { shiftId: id },
     });
 
     if (assignedCount > 0) {
       throw new BadRequestException(
-        `Cannot delete shift "${shift.name}" because ${assignedCount} faculty member(s) are currently assigned to it. Please unassign or reassign them first.`,
+        `Cannot delete shift "${shift.name}" because ${assignedCount} faculty schedule assignment(s) are linked to it. Please reassign them first.`,
       );
     }
 
@@ -294,8 +152,226 @@ export class ShiftsService implements OnApplicationBootstrap {
     return { success: true, message: `Shift "${shift.name}" successfully deleted` };
   }
 
+  // ── SCHOOL CALENDAR DAY MANAGEMENT ──
+
+  async getAllCalendarDays() {
+    return this.calendarDayRepository.find({
+      order: { date: 'ASC' },
+    });
+  }
+
+  async getCalendarDayStatus(date: string) {
+    const existing = await this.calendarDayRepository.findOne({
+      where: { date },
+    });
+    if (existing) {
+      return {
+        date: existing.date,
+        isSchoolDay: existing.isSchoolDay,
+        reason: existing.reason,
+        isCustom: true,
+      };
+    }
+    const dayOfWeek = this.getDayOfWeekNumber(date);
+    const isStandardWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+    return {
+      date,
+      isSchoolDay: isStandardWeekday,
+      reason: isStandardWeekday ? null : 'Weekend Off-Day',
+      isCustom: false,
+    };
+  }
+
+  async setCalendarDay(dto: SetCalendarDayDto) {
+    let day = await this.calendarDayRepository.findOne({
+      where: { date: dto.date },
+    });
+    if (day) {
+      day.isSchoolDay = dto.isSchoolDay;
+      day.reason = dto.reason || null;
+    } else {
+      day = this.calendarDayRepository.create({
+        date: dto.date,
+        isSchoolDay: dto.isSchoolDay,
+        reason: dto.reason || null,
+      });
+    }
+    return this.calendarDayRepository.save(day);
+  }
+
+  async deleteCalendarDay(date: string) {
+    const day = await this.calendarDayRepository.findOne({
+      where: { date },
+    });
+    if (!day) {
+      throw new NotFoundException(`No custom calendar override found for date ${date}`);
+    }
+    await this.calendarDayRepository.remove(day);
+    return { success: true, message: `Override removed for date ${date}` };
+  }
+
+  // ── TEACHER WEEKLY SHIFT MATRIX (7-DAY) ──
+
+  async getTeacherScheduleMatrix() {
+    const teachers = await this.userRepository.find({
+      where: { role: 'teacher' },
+      relations: { school: true },
+      order: { fullName: 'ASC' },
+    });
+
+    const teacherIds = teachers.map((t) => t.id);
+    const schedules = teacherIds.length
+      ? await this.staffScheduleRepository.find({
+          where: teacherIds.map((id) => ({ userId: id })),
+          relations: { shift: true },
+        })
+      : [];
+
+    const scheduleMap = new Map<
+      string,
+      Record<
+        number,
+        {
+          shiftId: string;
+          shiftName: string;
+          startTime: string;
+          endTime: string;
+          color: string;
+        } | null
+      >
+    >();
+
+    schedules.forEach((s) => {
+      if (!scheduleMap.has(s.userId)) {
+        scheduleMap.set(s.userId, {});
+      }
+      const userSched = scheduleMap.get(s.userId)!;
+      userSched[s.dayOfWeek] = s.shift
+        ? {
+            shiftId: s.shift.id,
+            shiftName: s.shift.name,
+            startTime: s.shift.startTime,
+            endTime: s.shift.endTime,
+            color: s.shift.color,
+          }
+        : null;
+    });
+
+    return teachers.map((t) => ({
+      id: t.id,
+      fullName: t.fullName,
+      email: t.email,
+      status: t.status,
+      school: t.school
+        ? { id: t.school.id, name: t.school.name, code: t.school.code }
+        : null,
+      schedules: scheduleMap.get(t.id) || {},
+    }));
+  }
+
+  async saveTeacherScheduleMatrix(dto: SaveTeacherScheduleDto) {
+    const teacher = await this.userRepository.findOne({
+      where: { id: dto.userId },
+    });
+    if (!teacher) {
+      throw new NotFoundException(`Teacher with ID ${dto.userId} not found`);
+    }
+
+    // Remove existing schedules for this teacher
+    await this.staffScheduleRepository.delete({ userId: dto.userId });
+
+    const newEntries: StaffSchedule[] = [];
+    for (const item of dto.schedules || []) {
+      if (item.shiftId) {
+        const entry = this.staffScheduleRepository.create({
+          userId: dto.userId,
+          dayOfWeek: Number(item.dayOfWeek),
+          shiftId: item.shiftId,
+        });
+        newEntries.push(entry);
+      }
+    }
+
+    if (newEntries.length > 0) {
+      await this.staffScheduleRepository.save(newEntries);
+    }
+
+    return {
+      success: true,
+      message: `Weekly schedule updated for teacher ${teacher.fullName}`,
+    };
+  }
+
+  // ── STAFF WORKING DAYS (ASSISTANTS & OFFICERS) ──
+
+  async getStaffScheduleList() {
+    const staffMembers = await this.userRepository
+      .createQueryBuilder('u')
+      .leftJoinAndSelect('u.school', 'school')
+      .where('u.role IN (:...roles)', { roles: ['assistant', 'officer'] })
+      .orderBy('u.fullName', 'ASC')
+      .getMany();
+
+    const staffIds = staffMembers.map((s) => s.id);
+    const schedules = staffIds.length
+      ? await this.staffScheduleRepository.find({
+          where: staffIds.map((id) => ({ userId: id })),
+        })
+      : [];
+
+    const scheduleMap = new Map<string, number[]>();
+    schedules.forEach((s) => {
+      if (!scheduleMap.has(s.userId)) {
+        scheduleMap.set(s.userId, []);
+      }
+      scheduleMap.get(s.userId)!.push(s.dayOfWeek);
+    });
+
+    return staffMembers.map((s) => ({
+      id: s.id,
+      fullName: s.fullName,
+      email: s.email,
+      role: s.role,
+      status: s.status,
+      school: s.school
+        ? { id: s.school.id, name: s.school.name, code: s.school.code }
+        : null,
+      daysOfWeek: scheduleMap.get(s.id) || [],
+    }));
+  }
+
+  async saveStaffSchedule(dto: SaveStaffScheduleDto) {
+    const staff = await this.userRepository.findOne({
+      where: { id: dto.userId },
+    });
+    if (!staff) {
+      throw new NotFoundException(`Staff with ID ${dto.userId} not found`);
+    }
+
+    // Remove existing schedules
+    await this.staffScheduleRepository.delete({ userId: dto.userId });
+
+    const newEntries = (dto.daysOfWeek || []).map((day) =>
+      this.staffScheduleRepository.create({
+        userId: dto.userId,
+        dayOfWeek: Number(day),
+        shiftId: null,
+      }),
+    );
+
+    if (newEntries.length > 0) {
+      await this.staffScheduleRepository.save(newEntries);
+    }
+
+    return {
+      success: true,
+      message: `Assigned working days updated for ${staff.fullName}`,
+    };
+  }
+
+  // ── LEGACY TEACHER SHIFTS (COMPATIBILITY) ──
+
   async getTeachersWithShifts() {
-    // Get all teachers with school details
     const teachers = await this.userRepository.find({
       where: { role: 'teacher' },
       relations: { school: true },
@@ -369,8 +445,10 @@ export class ShiftsService implements OnApplicationBootstrap {
       assignment.shiftId = dto.shiftId;
       assignment.status = 'active';
       assignment.isPermanent = true;
-      assignment.semester = dto.semester || assignment.semester || 'Fall 2026 Semester';
-      assignment.notes = dto.notes !== undefined ? dto.notes : assignment.notes;
+      assignment.semester =
+        dto.semester || assignment.semester || 'Fall 2026 Semester';
+      assignment.notes =
+        dto.notes !== undefined ? dto.notes : assignment.notes;
       if (assignedById) assignment.assignedById = assignedById;
       await this.teacherShiftRepository.save(assignment);
     } else {
@@ -386,7 +464,6 @@ export class ShiftsService implements OnApplicationBootstrap {
       await this.teacherShiftRepository.save(assignment);
     }
 
-    // Return the updated assignment with shift info
     return this.teacherShiftRepository.findOne({
       where: { id: assignment.id },
       relations: { shift: true, teacher: true },
@@ -431,40 +508,42 @@ export class ShiftsService implements OnApplicationBootstrap {
     });
 
     if (!assignment) {
-      throw new NotFoundException(`No assignment found for teacher ID ${teacherId}`);
+      throw new NotFoundException(
+        `No assignment found for teacher ID ${teacherId}`,
+      );
     }
 
     await this.teacherShiftRepository.remove(assignment);
-    return { success: true, message: 'Teacher successfully unassigned from shift' };
+    return {
+      success: true,
+      message: 'Teacher successfully unassigned from shift',
+    };
   }
 
-  async getAttendanceRecords(teacherId?: string) {
+  async getAttendanceRecords(staffId?: string) {
     const qb = this.attendanceRepository
       .createQueryBuilder('att')
-      .leftJoinAndSelect('att.teacher', 'teacher')
-      .leftJoinAndSelect('att.shift', 'shift')
+      .leftJoinAndSelect('att.staff', 'staff')
       .orderBy('att.date', 'DESC')
       .addOrderBy('att.createdAt', 'DESC');
 
-    if (teacherId) {
-      qb.andWhere('att.teacherId = :teacherId', { teacherId });
+    if (staffId) {
+      qb.andWhere('att.staffId = :staffId', { staffId });
     }
 
     const records = await qb.getMany();
+
     return records.map((record) => ({
       id: record.id,
-      teacherId: record.teacherId,
-      teacherName: record.teacher ? record.teacher.fullName : 'Unknown Teacher',
-      teacherEmail: record.teacher ? record.teacher.email : '',
-      teacherAvatar: record.teacher ? record.teacher.avatarUrl : null,
-      shiftId: record.shiftId,
-      shiftName: record.shift ? record.shift.name : 'Unknown Shift',
-      shiftStartTime: record.shift ? record.shift.startTime : '',
-      shiftEndTime: record.shift ? record.shift.endTime : '',
-      shiftColor: record.shift ? record.shift.color : 'blue',
+      staffId: record.staffId,
+      staffName: record.staff ? record.staff.fullName : 'Unknown Staff',
+      staffEmail: record.staff ? record.staff.email : '',
+      staffAvatar: record.staff ? record.staff.avatarUrl : null,
       date: record.date,
       checkInTime: record.checkInTime,
       checkOutTime: record.checkOutTime,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
       duration: record.duration,
       status: record.status,
       notes: record.notes,
@@ -472,6 +551,18 @@ export class ShiftsService implements OnApplicationBootstrap {
   }
 
   // ── HELPER UTILITIES ──
+
+  private getDayOfWeekNumber(dateStr: string): number {
+    const d = new Date(dateStr + 'T00:00:00');
+    const day = d.getDay();
+    return day === 0 ? 7 : day; // 1 = Monday, ..., 7 = Sunday
+  }
+
+  private timeToMinutes(t: string): number {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  }
 
   private getLocalDateString(d: Date = new Date()): string {
     const year = d.getFullYear();
@@ -500,7 +591,9 @@ export class ShiftsService implements OnApplicationBootstrap {
     return `${formatH(startTime)} - ${formatH(endTime)}`;
   }
 
-  private checkShiftWindow(shift: Shift): { isWithinShift: boolean; isLate: boolean } {
+  private checkShiftWindow(
+    shift: Shift,
+  ): { isWithinShift: boolean; isLate: boolean } {
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const [startH, startM] = shift.startTime.split(':').map(Number);
@@ -508,10 +601,9 @@ export class ShiftsService implements OnApplicationBootstrap {
     const startMinutes = (startH || 0) * 60 + (startM || 0);
     const endMinutes = (endH || 0) * 60 + (endM || 0);
 
-    // Allow check-in starting 30 minutes before shift until shift end
     const isWithinShift =
       currentMinutes >= startMinutes - 30 && currentMinutes <= endMinutes;
-    const isLate = currentMinutes > startMinutes + 10;
+    const isLate = currentMinutes > startMinutes + (shift.graceMinutes || 15);
     return { isWithinShift, isLate };
   }
 
@@ -527,18 +619,45 @@ export class ShiftsService implements OnApplicationBootstrap {
     }
 
     const today = this.getLocalDateString();
+    const dayOfWeek = this.getDayOfWeekNumber(today);
+
+    // 1. Check School Calendar Day
+    const calendarStatus = await this.getCalendarDayStatus(today);
+    const isSchoolDay = calendarStatus.isSchoolDay;
+    const calendarReason = calendarStatus.reason;
+
+    // 2. Check Staff Schedule for Today
+    const schedule = await this.staffScheduleRepository.findOne({
+      where: { userId, dayOfWeek },
+      relations: { shift: true },
+    });
+
+    let isScheduledToday = false;
+    let assignedShift: Shift | null = null;
+
+    if (user.role === 'teacher') {
+      if (schedule && schedule.shift) {
+        isScheduledToday = true;
+        assignedShift = schedule.shift;
+      } else {
+        isScheduledToday = false;
+      }
+    } else if (user.role === 'assistant' || user.role === 'officer') {
+      if (schedule) {
+        isScheduledToday = true;
+        assignedShift = schedule.shift || null;
+      } else {
+        isScheduledToday = false;
+      }
+    } else {
+      // Admin, Director, Headmaster scheduled on all school days
+      isScheduledToday = true;
+    }
 
     const attendance = await this.attendanceRepository.findOne({
-      where: { teacherId: userId, date: today },
-      relations: { shift: true },
+      where: { staffId: userId, date: today },
       order: { createdAt: 'DESC' },
     });
-
-    const assignment = await this.teacherShiftRepository.findOne({
-      where: { teacherId: userId, status: 'active' },
-      relations: { shift: true },
-    });
-    const assignedShift = assignment?.shift || null;
 
     let isWithinShift = true;
     if (assignedShift) {
@@ -549,13 +668,16 @@ export class ShiftsService implements OnApplicationBootstrap {
     const isCheckedIn = Boolean(attendance);
     const isCheckedOut = Boolean(attendance?.checkOutTime);
 
-    // canCheckIn: Not already checked in today (unrestricted check-in for all staff)
-    const canCheckIn = !isCheckedIn;
-    // canCheckOut: Checked in, but not yet checked out
+    // canCheckIn: Not already checked in, must be school open day, must be scheduled today
+    const canCheckIn = !isCheckedIn && isSchoolDay && isScheduledToday;
     const canCheckOut = isCheckedIn && !isCheckedOut;
 
     return {
       date: today,
+      dayOfWeek,
+      isSchoolDay,
+      calendarReason,
+      isScheduledToday,
       user: {
         id: user.id,
         fullName: user.fullName,
@@ -570,6 +692,7 @@ export class ShiftsService implements OnApplicationBootstrap {
             code: assignedShift.code,
             startTime: assignedShift.startTime,
             endTime: assignedShift.endTime,
+            graceMinutes: assignedShift.graceMinutes || 15,
             formattedHours: this.formatShiftHours(
               assignedShift.startTime,
               assignedShift.endTime,
@@ -588,10 +711,12 @@ export class ShiftsService implements OnApplicationBootstrap {
             date: attendance.date,
             checkInTime: attendance.checkInTime,
             checkOutTime: attendance.checkOutTime,
+            createdAt: attendance.createdAt,
+            updatedAt: attendance.updatedAt,
             duration: attendance.duration,
             status: attendance.status,
             notes: attendance.notes,
-            shiftName: attendance.shift?.name || assignedShift?.name || null,
+            shiftName: assignedShift?.name || null,
           }
         : null,
     };
@@ -606,35 +731,76 @@ export class ShiftsService implements OnApplicationBootstrap {
     }
 
     const today = this.getLocalDateString();
+    const dayOfWeek = this.getDayOfWeekNumber(today);
+    const dayNames = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
 
-    // Check if already checked in today
+    // 1. Enforce Calendar Day Status
+    const calendarStatus = await this.getCalendarDayStatus(today);
+    if (!calendarStatus.isSchoolDay) {
+      throw new BadRequestException(
+        `School is closed on this day (${calendarStatus.reason || 'School Off-Day'}). Check-in is not permitted.`,
+      );
+    }
+
+    // 2. Enforce Working Schedule
+    const schedule = await this.staffScheduleRepository.findOne({
+      where: { userId, dayOfWeek },
+      relations: { shift: true },
+    });
+
+    let assignedShift: Shift | null = null;
+
+    if (user.role === 'teacher') {
+      if (!schedule || !schedule.shift) {
+        throw new BadRequestException(
+          `You are not assigned to a shift on ${dayNames[dayOfWeek - 1]} and cannot check in.`,
+        );
+      }
+      assignedShift = schedule.shift;
+    } else if (user.role === 'assistant' || user.role === 'officer') {
+      if (!schedule) {
+        throw new BadRequestException(
+          `You are not scheduled to work on ${dayNames[dayOfWeek - 1]} and cannot check in.`,
+        );
+      }
+      assignedShift = schedule.shift || null;
+    }
+
+    // 3. Check if already checked in today
     const existing = await this.attendanceRepository.findOne({
-      where: { teacherId: userId, date: today },
+      where: { staffId: userId, date: today },
     });
     if (existing) {
       throw new BadRequestException('You have already checked in for today.');
     }
 
-    // Find assigned shift (if any)
-    const assignment = await this.teacherShiftRepository.findOne({
-      where: { teacherId: userId, status: 'active' },
-      relations: { shift: true },
-    });
-    const assignedShift = assignment?.shift || null;
-
+    // 4. Calculate Punctuality with graceMinutes
+    const now = new Date();
+    const currentMin = now.getHours() * 60 + now.getMinutes();
     let status: 'on_time' | 'late' | 'in_progress' = 'in_progress';
 
-    // Calculate late/on-time status based on assigned shift (no check-in blocking)
     if (assignedShift) {
-      const windowCheck = this.checkShiftWindow(assignedShift);
-      status = windowCheck.isLate ? 'late' : 'in_progress';
+      const shiftStartMin = this.timeToMinutes(assignedShift.startTime);
+      const limitMin = shiftStartMin + (assignedShift.graceMinutes || 15);
+      status = currentMin > limitMin ? 'late' : 'in_progress';
+    } else {
+      const defaultStartMin = this.timeToMinutes('08:00');
+      const limitMin = defaultStartMin + 15;
+      status = currentMin > limitMin ? 'late' : 'in_progress';
     }
 
-    const checkInTime = this.formatTime12h();
+    const checkInTime = this.formatTime12h(now);
 
     const record = this.attendanceRepository.create({
-      teacherId: userId,
-      shiftId: assignedShift?.id || null,
+      staffId: userId,
       date: today,
       checkInTime,
       checkOutTime: null,
@@ -649,10 +815,69 @@ export class ShiftsService implements OnApplicationBootstrap {
   }
 
   async checkOut(userId: string, notes?: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
     const today = this.getLocalDateString();
+    const dayOfWeek = this.getDayOfWeekNumber(today);
+    const dayNames = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    // 1. Enforce Calendar Day Status
+    const calendarStatus = await this.getCalendarDayStatus(today);
+    if (!calendarStatus.isSchoolDay) {
+      throw new BadRequestException(
+        `School is closed on this day (${calendarStatus.reason || 'School Off-Day'}). Check-out is not permitted.`,
+      );
+    }
+
+    // 2. Enforce Working Schedule
+    const schedule = await this.staffScheduleRepository.findOne({
+      where: { userId, dayOfWeek },
+      relations: { shift: true },
+    });
+
+    if (user.role === 'teacher') {
+      if (!schedule || !schedule.shift) {
+        const legacyAssignment = await this.teacherShiftRepository.findOne({
+          where: { teacherId: userId, status: 'active' },
+          relations: { shift: true },
+        });
+        const anyMatrix = await this.staffScheduleRepository.count({
+          where: { userId },
+        });
+        if (anyMatrix !== 0 || !legacyAssignment || !legacyAssignment.shift) {
+          throw new BadRequestException(
+            `You are not assigned to a shift on ${dayNames[dayOfWeek - 1]} and cannot check out.`,
+          );
+        }
+      }
+    } else if (user.role === 'assistant' || user.role === 'officer') {
+      if (!schedule) {
+        const anyMatrix = await this.staffScheduleRepository.count({
+          where: { userId },
+        });
+        if (anyMatrix !== 0 || dayOfWeek > 5) {
+          throw new BadRequestException(
+            `You are not scheduled to work on ${dayNames[dayOfWeek - 1]} and cannot check out.`,
+          );
+        }
+      }
+    }
 
     const record = await this.attendanceRepository.findOne({
-      where: { teacherId: userId, date: today },
+      where: { staffId: userId, date: today },
       order: { createdAt: 'DESC' },
     });
 
@@ -669,12 +894,15 @@ export class ShiftsService implements OnApplicationBootstrap {
     record.checkOutTime = this.formatTime12h(now);
 
     // Calculate duration
-    const diffMs = Math.max(0, now.getTime() - new Date(record.createdAt).getTime());
+    const diffMs = Math.max(
+      0,
+      now.getTime() - new Date(record.createdAt).getTime(),
+    );
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
     record.duration = `${hours}h ${mins.toString().padStart(2, '0')}m`;
-    record.status = 'completed';
+    record.status = record.status === 'late' ? 'late' : 'completed';
 
     if (notes) {
       record.notes = record.notes ? `${record.notes} | ${notes}` : notes;
@@ -692,6 +920,7 @@ export class ShiftsService implements OnApplicationBootstrap {
     caller: { id: string; role: string; schoolId?: string | null },
   ) {
     const targetDate = query.date || this.getLocalDateString();
+    const dayOfWeek = this.getDayOfWeekNumber(targetDate);
 
     // Determine school filter scope
     let schoolId = query.schoolId;
@@ -724,23 +953,22 @@ export class ShiftsService implements OnApplicationBootstrap {
     // 2. Fetch attendances for targetDate
     const attendances = await this.attendanceRepository
       .createQueryBuilder('att')
-      .leftJoinAndSelect('att.shift', 'shift')
       .where('att.date = :targetDate', { targetDate })
       .getMany();
 
     const attendanceMap = new Map<string, TeacherAttendance>();
     attendances.forEach((att) => {
-      attendanceMap.set(att.teacherId, att);
+      attendanceMap.set(att.staffId, att);
     });
 
-    // 3. Fetch active shifts
-    const assignments = await this.teacherShiftRepository.find({
-      where: { status: 'active' },
+    // 3. Fetch matrix schedules for targetDate day of week
+    const schedules = await this.staffScheduleRepository.find({
+      where: { dayOfWeek },
       relations: { shift: true },
     });
-    const assignmentMap = new Map<string, Shift>();
-    assignments.forEach((as) => {
-      if (as.shift) assignmentMap.set(as.teacherId, as.shift);
+    const scheduleMap = new Map<string, Shift | null>();
+    schedules.forEach((s) => {
+      scheduleMap.set(s.userId, s.shift || null);
     });
 
     // 3b. Fetch approved leaves for targetDate
@@ -757,7 +985,7 @@ export class ShiftsService implements OnApplicationBootstrap {
     // 4. Map staff rows
     const allRecords = staffList.map((staff, idx) => {
       const att = attendanceMap.get(staff.id);
-      const shift = assignmentMap.get(staff.id);
+      const shift = scheduleMap.get(staff.id);
       const leave = leaveMap.get(staff.id);
 
       let monitorStatus:
@@ -789,20 +1017,27 @@ export class ShiftsService implements OnApplicationBootstrap {
         teacherRole: staff.role,
         schoolName: staff.school?.name || 'Main Campus',
         schoolId: staff.schoolId,
-        shiftName: shift?.name || 'General Duty',
+        shiftName: shift?.name || 'Standard Duty',
         shiftTime: shiftHours,
         shiftColor: shift?.color || 'blue',
         status: monitorStatus,
         checkInTime: att?.checkInTime || null,
         checkOutTime: att?.checkOutTime || null,
+        createdAt: att?.createdAt || null,
+        updatedAt: att?.updatedAt || null,
         duration: att?.duration || null,
-        notes: leave ? `On Approved Leave: ${leave.reason}` : att?.notes || null,
+        notes: leave
+          ? `On Approved Leave: ${leave.reason}`
+          : att?.notes || null,
       };
     });
 
     // 5. Calculate KPI counts
     const alreadyCheckedCount = allRecords.filter(
-      (r) => r.status === 'checked_in' || r.status === 'checked_out' || r.status === 'late',
+      (r) =>
+        r.status === 'checked_in' ||
+        r.status === 'checked_out' ||
+        r.status === 'late',
     ).length;
     const onLeaveCount = allRecords.filter(
       (r) => r.status === 'on_leave',
@@ -821,7 +1056,9 @@ export class ShiftsService implements OnApplicationBootstrap {
       } else if (query.status === 'checked_out') {
         filteredRecords = allRecords.filter((r) => r.status === 'checked_out');
       } else if (query.status === 'not_checked_in') {
-        filteredRecords = allRecords.filter((r) => r.status === 'not_checked_in');
+        filteredRecords = allRecords.filter(
+          (r) => r.status === 'not_checked_in',
+        );
       } else if (query.status === 'on_leave') {
         filteredRecords = allRecords.filter((r) => r.status === 'on_leave');
       }
@@ -839,4 +1076,3 @@ export class ShiftsService implements OnApplicationBootstrap {
     };
   }
 }
-

@@ -26,6 +26,9 @@ export class UpdateShiftDefinitionDto {
   color?: string;
 
   @IsOptional()
+  graceMinutes?: number;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

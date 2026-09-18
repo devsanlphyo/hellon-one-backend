@@ -29,6 +29,9 @@ export class Shift {
   @Column({ default: 'blue' })
   color: string;
 
+  @Column({ type: 'integer', default: 15 })
+  graceMinutes: number;
+
   @Column({ default: true })
   isActive: boolean;
 

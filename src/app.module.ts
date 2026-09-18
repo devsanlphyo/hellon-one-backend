@@ -12,6 +12,8 @@ import { SchoolsModule } from './schools/schools.module';
 import { AppSettings } from './settings/entities/settings.entity';
 import { SettingsModule } from './settings/settings.module';
 import { Shift } from './shifts/entities/shift.entity';
+import { StaffSchedule } from './shifts/entities/staff-schedule.entity';
+import { CalendarDay } from './shifts/entities/calendar-day.entity';
 import { TeacherAttendance } from './shifts/entities/teacher-attendance.entity';
 import { TeacherShift } from './shifts/entities/teacher-shift.entity';
 import { ShiftsModule } from './shifts/shifts.module';
@@ -47,6 +49,8 @@ import { UsersModule } from './users/users.module';
         ClassSubject,
         AppSettings,
         Shift,
+        StaffSchedule,
+        CalendarDay,
         TeacherShift,
         TeacherAttendance,
         LeaveRequest,

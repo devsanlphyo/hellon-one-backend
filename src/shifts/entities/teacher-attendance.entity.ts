@@ -8,7 +8,6 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../auth/entities/user.entity';
-import { Shift } from './shift.entity';
 
 @Entity('teacher_attendance')
 export class TeacherAttendance {
@@ -16,18 +15,11 @@ export class TeacherAttendance {
   id: string;
 
   @Column({ type: 'uuid' })
-  teacherId: string;
+  staffId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'teacherId' })
-  teacher: User;
-
-  @Column({ type: 'uuid', nullable: true })
-  shiftId: string | null;
-
-  @ManyToOne(() => Shift, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'shiftId' })
-  shift?: Shift | null;
+  @JoinColumn({ name: 'staffId' })
+  staff: User;
 
   @Column({ type: 'date' })
   date: string; // YYYY-MM-DD

@@ -28,7 +28,7 @@ export class LeavesService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedInitialLeaveRequests();
+    // Auto-seeding disabled to keep database clean
   }
 
   private async seedInitialLeaveRequests() {

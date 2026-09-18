@@ -21,7 +21,7 @@ export class SubjectsService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedDefaultSubjects();
+    // Auto-seeding disabled to keep database clean
   }
 
   async seedDefaultSubjects() {

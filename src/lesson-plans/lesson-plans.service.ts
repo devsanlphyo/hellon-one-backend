@@ -43,7 +43,7 @@ export class LessonPlansService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedInitialLessonPlans();
+    // Auto-seeding disabled to keep database clean
   }
 
   private getLocalDateString(): string {

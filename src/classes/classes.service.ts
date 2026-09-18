@@ -36,7 +36,7 @@ export class ClassesService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedDefaultClasses();
+    // Auto-seeding disabled to keep database clean
   }
 
   async seedDefaultClasses() {

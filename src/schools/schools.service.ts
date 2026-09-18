@@ -28,7 +28,7 @@ export class SchoolsService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedDefaultSchools();
+    // Auto-seeding disabled to keep database clean
   }
 
   async seedDefaultSchools() {

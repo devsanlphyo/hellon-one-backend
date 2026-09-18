@@ -41,7 +41,7 @@ export class FeedService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
-    await this.seedInitialPosts();
+    // Auto-seeding disabled to keep database clean
   }
 
   /**
