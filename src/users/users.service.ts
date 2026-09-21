@@ -163,6 +163,10 @@ export class UsersService {
       user.status = dto.status as UserStatus;
     }
 
+    if (dto.schoolId !== undefined) {
+      user.schoolId = dto.schoolId || null;
+    }
+
     if (dto.avatarUrl !== undefined) {
       if (user.avatarUrl && user.avatarUrl !== dto.avatarUrl) {
         this.deleteAvatarFile(user.avatarUrl);

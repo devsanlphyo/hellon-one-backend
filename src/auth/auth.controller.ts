@@ -29,6 +29,7 @@ export class AuthController {
       dto.password,
       dto.role,
       dto.status,
+      dto.schoolId,
     );
   }
 }

@@ -34,4 +34,7 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   avatarUrl?: string | null;
+  @IsOptional()
+  @IsString()
+  schoolId?: string | null;
 }

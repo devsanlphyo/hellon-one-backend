@@ -235,6 +235,7 @@ export class AuthService implements OnApplicationBootstrap {
     password: string,
     role: UserRole,
     status: UserStatus = 'active',
+    schoolId?: string | null,
   ) {
     this.logger.log(`Registering new user: ${email} [Role: ${role}, Status: ${status}]`);
     const existingUser = await this.userRepository.findOneBy({ email });
@@ -251,6 +252,7 @@ export class AuthService implements OnApplicationBootstrap {
     user.password = hashedPassword;
     user.role = role;
     user.status = status;
+    user.schoolId = schoolId || null;
 
     const savedUser = await this.userRepository.save(user);
     this.logger.log(`User registered successfully: ${savedUser.email} (ID: ${savedUser.id})`);
@@ -264,6 +266,7 @@ export class AuthService implements OnApplicationBootstrap {
         email: savedUser.email,
         role: savedUser.role,
         status: savedUser.status,
+        schoolId: savedUser.schoolId,
         createdAt: savedUser.createdAt,
       },
     };

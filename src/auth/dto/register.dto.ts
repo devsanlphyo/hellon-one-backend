@@ -29,4 +29,8 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(['active', 'suspend'], { message: 'Invalid user status' })
   status?: UserStatus;
+
+  @IsOptional()
+  @IsString()
+  schoolId?: string | null;
 }
