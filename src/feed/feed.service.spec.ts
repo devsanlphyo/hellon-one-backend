@@ -26,6 +26,8 @@ describe('FeedService Flow Tests', () => {
     mediaRepo = {
       create: jest.fn((m) => m),
       save: jest.fn((m) => Promise.resolve(m)),
+      find: jest.fn().mockResolvedValue([]),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     reactionRepo = {
       findOne: jest.fn(),
@@ -155,6 +157,22 @@ describe('FeedService Flow Tests', () => {
       await expect(service.updatePost(systemAdmin, 'post-5', { content: 'Admin Edit' })).rejects.toThrow(
         ForbiddenException,
       );
+    });
+
+    it('Flow 7: Campus staff can remove media items when editing', async () => {
+      const ownPost: Partial<FeedPost> = {
+        id: 'post-4',
+        authorId: campusTeacher.id,
+        content: 'Original Content',
+        isDeleted: false,
+      };
+      postRepo.findOne.mockResolvedValue(ownPost);
+      mediaRepo.find.mockResolvedValue([{ id: 'media-1', fileUrl: '' }]);
+      mediaRepo.delete.mockResolvedValue({ affected: 1 } as any);
+      jest.spyOn(service, 'getPostById').mockResolvedValue({ id: 'post-4', content: 'Updated' } as any);
+
+      await service.updatePost(campusTeacher, 'post-4', { content: 'Updated', removeMediaIds: ['media-1'] });
+      expect(mediaRepo.delete).toHaveBeenCalled();
     });
   });
 

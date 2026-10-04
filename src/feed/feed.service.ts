@@ -7,7 +7,7 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { User } from '../auth/entities/user.entity';
 import { School } from '../schools/entities/school.entity';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -386,6 +386,29 @@ export class FeedService implements OnApplicationBootstrap {
     }
     if (dto.theme !== undefined) {
       post.theme = dto.theme;
+    }
+
+    if (dto.removeMediaIds && dto.removeMediaIds.length > 0) {
+      const mediaToDelete = await this.mediaRepository.find({
+        where: { id: In(dto.removeMediaIds), postId: post.id },
+      });
+      for (const m of mediaToDelete) {
+        try {
+          if (m.fileUrl) {
+            const relPath = m.fileUrl.replace(/^\//, '');
+            const fullPath = path.join(process.cwd(), 'public', relPath);
+            if (fs.existsSync(fullPath)) {
+              fs.unlinkSync(fullPath);
+            }
+          }
+        } catch (e) {
+          this.logger.warn(`Failed to unlink file for media ${m.id}: ${e}`);
+        }
+      }
+      await this.mediaRepository.delete({
+        id: In(dto.removeMediaIds),
+        postId: post.id,
+      });
     }
 
     await this.postRepository.save(post);

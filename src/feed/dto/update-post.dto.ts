@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class UpdatePostDto {
   @IsString()
@@ -12,4 +12,8 @@ export class UpdatePostDto {
   @IsOptional()
   @IsString()
   theme?: string;
+
+  @IsOptional()
+  @IsArray()
+  removeMediaIds?: string[];
 }
