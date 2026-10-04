@@ -40,6 +40,13 @@ export class LeavesController {
     return this.leavesService.getMyLeaveRequests(userId);
   }
 
+  @Get('mine')
+  @Roles('teacher', 'assistant', 'officer', 'headmaster', 'director', 'admin')
+  async getMineLeaveRequests(@Request() req) {
+    const userId = req.user?.id || req.user?.sub;
+    return this.leavesService.getMyLeaveRequests(userId);
+  }
+
   // ── 3. KPI STATS (HEADMASTER, DIRECTOR, ADMIN) ──
   @Get('stats')
   @Roles('headmaster', 'director', 'admin')
