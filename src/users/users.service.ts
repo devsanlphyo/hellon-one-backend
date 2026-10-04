@@ -250,7 +250,10 @@ export class UsersService {
   }
 
   async getProfile(id: string) {
-    const existingUser = await this.userRepository.findOneBy({ id });
+    const existingUser = await this.userRepository.findOne({
+      where: { id },
+      relations: { school: true },
+    });
     if (!existingUser) {
       this.logger.warn(`Profile lookup failed: user with ID ${id} not found`);
       throw new NotFoundException('User not found');
