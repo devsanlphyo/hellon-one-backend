@@ -23,6 +23,7 @@ import { AddCommentDto } from './dto/add-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { QueryFeedDto } from './dto/query-feed.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { ReactPostDto } from './dto/react-post.dto';
 import { FeedService } from './feed.service';
 
 const ALLOWED_IMAGE_TYPES = [
@@ -127,8 +128,12 @@ export class FeedController {
    * Toggle reaction
    */
   @Post(':id/react')
-  async toggleReaction(@Req() req: any, @Param('id') id: string) {
-    return this.feedService.toggleReaction(req.user, id);
+  async toggleReaction(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto?: ReactPostDto,
+  ) {
+    return this.feedService.toggleReaction(req.user, id, dto?.type || 'like');
   }
 
   /**

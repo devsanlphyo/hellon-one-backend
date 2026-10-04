@@ -8,4 +8,8 @@ export class UpdatePostDto {
   @IsOptional()
   @IsIn(['public', 'campus', 'private'])
   visibility?: 'public' | 'campus' | 'private';
+
+  @IsOptional()
+  @IsString()
+  theme?: string;
 }

@@ -129,7 +129,10 @@ export class FeedService implements OnApplicationBootstrap {
 
     // Map and annotate with user-specific flags (e.g. hasLiked, permissions)
     const formatted = posts.map((p) => {
-      const hasLiked = p.reactions?.some((r) => r.userId === user.id) || false;
+      const userReaction = p.reactions?.find((r) => r.userId === user.id);
+      const hasLiked = !!userReaction;
+      const userReactionType = userReaction ? userReaction.type : null;
+      const reactionTypes = Array.from(new Set((p.reactions || []).map((r) => r.type)));
       const canEdit = p.authorId === user.id;
       const canDelete = isMultiCampus || p.authorId === user.id;
 
@@ -166,6 +169,7 @@ export class FeedService implements OnApplicationBootstrap {
       return {
         id: p.id,
         content: p.content,
+        theme: p.theme || 'none',
         visibility: p.visibility,
         isAnnouncement: p.isAnnouncement,
         isPinned: p.isPinned,
@@ -188,6 +192,8 @@ export class FeedService implements OnApplicationBootstrap {
         mediaItems: (p.mediaItems || []).sort((a, b) => a.sortOrder - b.sortOrder),
         reactionCount: p.reactions?.length || 0,
         hasLiked,
+        userReaction: userReactionType,
+        reactionTypes,
         commentsCount: (p.comments?.length || 0),
         comments: topLevelComments,
         canEdit,
@@ -233,6 +239,7 @@ export class FeedService implements OnApplicationBootstrap {
       authorId: user.id,
       schoolId: targetSchoolId,
       content: dto.content,
+      theme: dto.theme || 'none',
       visibility,
       isAnnouncement: isMultiCampus ? !!dto.isAnnouncement : false,
       isPinned: isMultiCampus ? !!dto.isPinned : false,
@@ -281,7 +288,10 @@ export class FeedService implements OnApplicationBootstrap {
     }
 
     const isMultiCampus = user.role === 'admin' || user.role === 'director';
-    const hasLiked = post.reactions?.some((r) => r.userId === user.id) || false;
+    const userReaction = post.reactions?.find((r) => r.userId === user.id);
+    const hasLiked = !!userReaction;
+    const userReactionType = userReaction ? userReaction.type : null;
+    const reactionTypes = Array.from(new Set((post.reactions || []).map((r) => r.type)));
     const canEdit = post.authorId === user.id;
     const canDelete = isMultiCampus || post.authorId === user.id;
 
@@ -317,6 +327,7 @@ export class FeedService implements OnApplicationBootstrap {
     return {
       id: post.id,
       content: post.content,
+      theme: post.theme || 'none',
       visibility: post.visibility,
       isAnnouncement: post.isAnnouncement,
       isPinned: post.isPinned,
@@ -339,6 +350,8 @@ export class FeedService implements OnApplicationBootstrap {
       mediaItems: (post.mediaItems || []).sort((a, b) => a.sortOrder - b.sortOrder),
       reactionCount: post.reactions?.length || 0,
       hasLiked,
+      userReaction: userReactionType,
+      reactionTypes,
       commentsCount: post.comments?.length || 0,
       comments: topLevelComments,
       canEdit,
@@ -370,6 +383,9 @@ export class FeedService implements OnApplicationBootstrap {
     }
     if (dto.visibility !== undefined) {
       post.visibility = dto.visibility;
+    }
+    if (dto.theme !== undefined) {
+      post.theme = dto.theme;
     }
 
     await this.postRepository.save(post);
@@ -408,9 +424,9 @@ export class FeedService implements OnApplicationBootstrap {
   }
 
   /**
-   * Toggle Reaction (Like / Heart)
+   * Toggle Reaction (Like, Love, Care, Haha, Wow, Sad, Angry)
    */
-  async toggleReaction(user: User, postId: string) {
+  async toggleReaction(user: User, postId: string, type: string = 'like') {
     const post = await this.postRepository.findOne({
       where: { id: postId, isDeleted: false },
     });
@@ -424,19 +440,33 @@ export class FeedService implements OnApplicationBootstrap {
     });
 
     if (existing) {
-      await this.reactionRepository.remove(existing);
-      const count = await this.reactionRepository.count({ where: { postId } });
-      return { liked: false, reactionCount: count };
+      if (existing.type === type) {
+        // Same reaction clicked again -> remove it (toggle off)
+        await this.reactionRepository.remove(existing);
+      } else {
+        // Different reaction clicked -> switch reaction type!
+        existing.type = type;
+        await this.reactionRepository.save(existing);
+      }
     } else {
       const reaction = this.reactionRepository.create({
         postId,
         userId: user.id,
-        type: 'like',
+        type,
       });
       await this.reactionRepository.save(reaction);
-      const count = await this.reactionRepository.count({ where: { postId } });
-      return { liked: true, reactionCount: count };
     }
+
+    const reactions = await this.reactionRepository.find({ where: { postId } });
+    const userReaction = reactions.find((r) => r.userId === user.id);
+    const reactionTypes = Array.from(new Set(reactions.map((r) => r.type)));
+
+    return {
+      liked: !!userReaction,
+      userReaction: userReaction ? userReaction.type : null,
+      reactionCount: reactions.length,
+      reactionTypes,
+    };
   }
 
   /**

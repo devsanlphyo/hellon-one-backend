@@ -44,6 +44,12 @@ export class FeedPost {
   })
   visibility: PostVisibility;
 
+  @Column({
+    type: 'varchar',
+    default: 'none',
+  })
+  theme: string;
+
   @Column({ type: 'boolean', default: false })
   isAnnouncement: boolean;
 

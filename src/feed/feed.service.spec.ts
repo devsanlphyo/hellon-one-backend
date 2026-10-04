@@ -31,6 +31,9 @@ describe('FeedService Flow Tests', () => {
       findOne: jest.fn(),
       create: jest.fn((r) => r),
       save: jest.fn((r) => Promise.resolve(r)),
+      remove: jest.fn((r) => Promise.resolve(r)),
+      find: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
       delete: jest.fn(),
     };
     commentRepo = {
@@ -260,6 +263,97 @@ describe('FeedService Flow Tests', () => {
         'post.schoolId = :filterSchool',
         { filterSchool: 'campus-target-123' },
       );
+    });
+  });
+
+  describe('Post Theme Support', () => {
+    it('saves theme when creating post', async () => {
+      jest.spyOn(service, 'getPostById').mockImplementation((id: string) => Promise.resolve({ id } as any));
+
+      await service.createPost(campusTeacher, {
+        content: 'Sunset Announcement',
+        theme: 'sunset',
+      });
+
+      expect(postRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'Sunset Announcement',
+          theme: 'sunset',
+        }),
+      );
+    });
+
+    it('updates post theme when editing', async () => {
+      const existingPost: Partial<FeedPost> = {
+        id: 'post-theme-1',
+        authorId: campusTeacher.id,
+        content: 'Original Content',
+        theme: 'none',
+        isDeleted: false,
+      };
+      postRepo.findOne.mockResolvedValue(existingPost);
+      jest.spyOn(service, 'getPostById').mockImplementation((id: string) => Promise.resolve({ id } as any));
+
+      await service.updatePost(campusTeacher, 'post-theme-1', {
+        content: 'Updated Content',
+        theme: 'ocean',
+      });
+
+      expect(postRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'Updated Content',
+          theme: 'ocean',
+        }),
+      );
+    });
+  });
+
+  describe('Emoji Reactions Support', () => {
+    it('creates a new reaction with custom emoji type', async () => {
+      postRepo.findOne.mockResolvedValue({ id: 'post-r-1', isDeleted: false });
+      reactionRepo.findOne.mockResolvedValue(null);
+      reactionRepo.find.mockResolvedValue([{ postId: 'post-r-1', userId: campusTeacher.id, type: 'love' }]);
+
+      const result = await service.toggleReaction(campusTeacher, 'post-r-1', 'love');
+
+      expect(reactionRepo.create).toHaveBeenCalledWith({
+        postId: 'post-r-1',
+        userId: campusTeacher.id,
+        type: 'love',
+      });
+      expect(result.liked).toBe(true);
+      expect(result.userReaction).toBe('love');
+      expect(result.reactionTypes).toEqual(['love']);
+    });
+
+    it('removes reaction when clicking same reaction type again (toggle off)', async () => {
+      postRepo.findOne.mockResolvedValue({ id: 'post-r-1', isDeleted: false });
+      const existingReaction = { postId: 'post-r-1', userId: campusTeacher.id, type: 'love' };
+      reactionRepo.findOne.mockResolvedValue(existingReaction);
+      reactionRepo.find.mockResolvedValue([]);
+
+      const result = await service.toggleReaction(campusTeacher, 'post-r-1', 'love');
+
+      expect(reactionRepo.remove).toHaveBeenCalledWith(existingReaction);
+      expect(result.liked).toBe(false);
+      expect(result.userReaction).toBeNull();
+    });
+
+    it('switches reaction type when clicking a different emoji', async () => {
+      postRepo.findOne.mockResolvedValue({ id: 'post-r-1', isDeleted: false });
+      const existingReaction = { postId: 'post-r-1', userId: campusTeacher.id, type: 'like' };
+      reactionRepo.findOne.mockResolvedValue(existingReaction);
+      reactionRepo.find.mockResolvedValue([{ postId: 'post-r-1', userId: campusTeacher.id, type: 'haha' }]);
+
+      const result = await service.toggleReaction(campusTeacher, 'post-r-1', 'haha');
+
+      expect(reactionRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'haha',
+        }),
+      );
+      expect(result.liked).toBe(true);
+      expect(result.userReaction).toBe('haha');
     });
   });
 });

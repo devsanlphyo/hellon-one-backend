@@ -15,6 +15,10 @@ export class CreatePostDto {
   schoolId?: string;
 
   @IsOptional()
+  @IsString()
+  theme?: string = 'none';
+
+  @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isAnnouncement?: boolean = false;
